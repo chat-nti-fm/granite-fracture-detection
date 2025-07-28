@@ -59,8 +59,10 @@ def generate_synthetic_volume(
     ray_hardening_strength: float = 0.5,
     radial_fluctuation_strength: float = 0.1,
     fill_fraction: float = 0.3,
+    rock_strength: float | None = None,
+    rock_smooth: float = 3.0,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Generate a synthetic CT volume with beam hardening, ring artefacts and fractures.
+    """Generate a synthetic CT volume with optional rock structure, beam hardening, ring artefacts and fractures.
 
     Parameters
     ----------
@@ -86,11 +88,21 @@ def generate_synthetic_volume(
         Fraction of fractures that are considered filled (i.e. do not reduce
         intensity).  For such fractures the ground truth fracture fraction
         remains zero.
+    rock_strength : float or None, optional
+        Standard deviation of a synthetic rock texture to add to the base
+        intensity.  If ``None`` (default), no rock texture is added.  A value
+        greater than zero produces spatially correlated intensity fluctuations
+        across the volume, emulating mineralogical heterogeneity of granite.
+    rock_smooth : float, optional
+        Standard deviation of the Gaussian kernel used to smooth the random
+        field that generates the rock texture.  Larger values lead to more
+        slowly varying rock structure.
 
     Returns
     -------
     volume : ndarray of shape ``shape``
-        Simulated CT volume containing artefacts and fractures.
+        Simulated CT volume containing artefacts and fractures (and optional
+        rock heterogeneity).
     gt_fracture : ndarray of shape ``shape``
         Ground‑truth fracture fraction per voxel (0–1).  This array can be
         used to assess the performance of detection algorithms.
@@ -98,6 +110,23 @@ def generate_synthetic_volume(
     z_dim, y_dim, x_dim = shape
     volume = np.ones(shape, dtype=np.float64)
     gt_frac = np.zeros(shape, dtype=np.float64)
+
+    # Optionally add a synthetic rock texture to the base intensity.  Many
+    # natural granites exhibit spatial variation in density due to different
+    # mineralogical constituents.  We simulate this as a smoothed random
+    # field whose standard deviation is ``rock_strength``.
+    if rock_strength is not None and rock_strength > 0.0:
+        rng = np.random.default_rng()
+        rock_noise = rng.standard_normal(size=shape)
+        from scipy.ndimage import gaussian_filter
+
+        rock_noise = gaussian_filter(rock_noise, sigma=rock_smooth)
+        # normalise to zero mean, unit variance
+        rock_noise -= rock_noise.mean()
+        if rock_noise.std() > 0:
+            rock_noise /= rock_noise.std()
+        # scale by requested strength and add to base intensity
+        volume += rock_strength * rock_noise
 
     # Coordinates centred at origin
     zz, yy, xx = np.meshgrid(
