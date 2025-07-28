@@ -19,6 +19,7 @@ from .ring_correction import remove_radial_artifacts
 from .fracture_detection import detect_fractures
 from .synthetic import generate_synthetic_volume
 from .metrics import snr, f1_score, mse
+from .vtk_utils import write_vtk
 
 __all__ = [
     "correct_beam_hardening",
@@ -28,4 +29,5 @@ __all__ = [
     "snr",
     "f1_score",
     "mse",
+    "write_vtk",
 ]
